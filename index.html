@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>8 Ball Pool Bid Manager</title>
+<style>
+  :root{
+    --bg:#f5f7fb; --card:#ffffff; --text:#172033; --muted:#667085; --line:#e4e7ec;
+    --primary:#1f4b99; --primary2:#17396f; --green:#1f8f55; --greenbg:#eaf7ef;
+    --red:#c43d3d; --redbg:#fdecec; --amber:#b77600; --amberbg:#fff6df;
+    --shadow:0 10px 30px rgba(18,38,63,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+  button,input,select{font:inherit}
+  .app{min-height:100vh;display:grid;grid-template-columns:245px 1fr}
+  .sidebar{background:#101828;color:#fff;padding:22px 16px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;gap:12px;align-items:center;padding:4px 8px 22px}
+  .ball{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#111;border:3px solid #fff;font-weight:800}
+  .brand h1{font-size:17px;margin:0}.brand small{display:block;color:#98a2b3;margin-top:3px}
+  nav button{width:100%;border:0;background:transparent;color:#d0d5dd;text-align:left;padding:11px 12px;border-radius:9px;cursor:pointer;margin:2px 0}
+  nav button:hover,nav button.active{background:#1d2939;color:#fff}
+  .main{padding:28px;max-width:1500px;width:100%}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}
+  .topbar h2{margin:0;font-size:25px}.topbar p{margin:4px 0 0;color:var(--muted)}
+  .actions{display:flex;gap:9px;flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:#fff;padding:9px 14px;border-radius:9px;cursor:pointer;font-weight:650;color:#344054}
+  .btn:hover{background:#f9fafb}.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .btn.primary:hover{background:var(--primary2)}.btn.danger{color:#b42318}.btn.small{padding:6px 9px;font-size:13px}
+  .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}
+  .stat,.card{background:var(--card);border:1px solid #eaecf0;border-radius:14px;box-shadow:var(--shadow)}
+  .stat{padding:18px}.stat .label{color:var(--muted);font-size:13px}.stat .value{font-size:27px;font-weight:800;margin-top:8px}
+  .card{padding:18px;margin-top:16px}.card h3{margin:0 0 14px;font-size:17px}
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:11px}
+  table{width:100%;border-collapse:collapse;background:#fff;min-width:750px}
+  th,td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+  th{background:#f9fafb;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:#475467}
+  tr:last-child td{border-bottom:0}.num{text-align:right;font-variant-numeric:tabular-nums}
+  .pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}
+  .pill.done{background:var(--greenbg);color:var(--green)}.pill.open{background:var(--amberbg);color:var(--amber)}
+  .pill.win{background:#eaf7ef;color:#147a45}.pill.loss{background:#fdecec;color:#b42318}
+  .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:150px}.field label{font-size:12px;font-weight:700;color:#475467}
+  input,select{border:1px solid #d0d5dd;border-radius:8px;padding:9px 10px;background:#fff;color:#101828}
+  .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.form-grid .full{grid-column:1/-1}
+  .notice{padding:12px 14px;border-radius:10px;background:#eef4ff;color:#3538cd;border:1px solid #d1e0ff;margin-bottom:15px}
+  .result-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.sidebox{border-radius:13px;overflow:hidden;border:1px solid var(--line)}
+  .sidebox .head{padding:13px 15px;font-weight:800}.sidebox.green .head{background:#d9f2e3;color:#146c43}.sidebox.red .head{background:#fbdede;color:#a12626}
+  .empty{padding:28px;text-align:center;color:var(--muted)}
+  .hidden{display:none!important}
+  .modal-bg{position:fixed;inset:0;background:rgba(16,24,40,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
+  .modal{background:#fff;width:min(720px,100%);max-height:92vh;overflow:auto;border-radius:16px;padding:20px;box-shadow:0 30px 70px rgba(0,0,0,.25)}
+  .modal h3{margin-top:0}.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+  .match-title{font-weight:800}.sub{font-size:12px;color:var(--muted)}
+  .summary-strip{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 0}.summary-chip{background:#f2f4f7;padding:8px 10px;border-radius:8px;font-size:13px}
+  .danger-text{color:#b42318}.success-text{color:#067647}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.tabs button{border:1px solid var(--line);padding:8px 11px;background:#fff;border-radius:8px;cursor:pointer}.tabs button.active{background:#101828;color:#fff}
+  .footer-note{color:#667085;font-size:12px;margin-top:14px}
+  @media(max-width:1000px){.app{grid-template-columns:1fr}.sidebar{height:auto;position:relative}.sidebar nav{display:flex;overflow:auto}.sidebar nav button{white-space:nowrap;width:auto}.grid4{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:650px){.main{padding:16px}.grid4,.result-grid,.form-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-direction:column}}
+  @media print{.sidebar,.topbar .actions,.btn,.filters,.tabs{display:none!important}.app{display:block}.main{padding:0}.card,.stat{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="ball">8</div><div><h1>Pool Bid Manager</h1><small>Cash collection & payout</small></div></div>
+    <nav id="nav">
+      <button data-view="dashboard" class="active">Dashboard</button>
+      <button data-view="matches">Matches & Bids</button>
+      <button data-view="settlement">Overall Settlement</button>
+      <button data-view="people">People</button>
+      <button data-view="settings">Settings</button>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div id="dashboardView" class="view"></div>
+    <div id="matchesView" class="view hidden"></div>
+    <div id="settlementView" class="view hidden"></div>
+    <div id="peopleView" class="view hidden"></div>
+    <div id="settingsView" class="view hidden"></div>
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+const KEY='poolBidManager.v6';
+
+const seed = {
+  settings:{ INR:1, AED:25, SAR:25, decimals:2 },
+  matches:[
+    {id:'m1',round:'Round of 16',a:'Sneha',b:'Gaurav',winner:'Gaurav',bids:[
+      ['Abdul Rahman','Sneha',10,'SAR'],['Akhila Mohan','Sneha',10,'AED'],['Nithin Suresh','Sneha',100,'INR'],['Nijil','Sneha',10,'AED'],['Hend Ali','Sneha',10,'SAR'],['Dr. Allan','Sneha',100,'INR'],['Sree Vishak','Sneha',10,'AED'],['Ameer Ali','Sneha',10,'AED'],['Bajith','Sneha',100,'INR'],['Maha','Sneha',10,'AED'],['Sabrish','Sneha',100,'INR'],['Beshoy','Sneha',10,'AED'],['Dolly Roy','Sneha',100,'INR'],
+      ['Jerin','Gaurav',100,'INR'],['Jehin','Gaurav',100,'INR'],['Rahul Pillai','Gaurav',10,'AED'],['Syamsankar','Gaurav',10,'AED'],['Parul Thakur','Gaurav',10,'AED'],['Sreeregh','Gaurav',10,'AED'],['Prabijith','Gaurav',10,'AED']
+    ]},
+    {id:'m2',round:'Round of 16',a:'Ravishankar',b:'Mrianna',winner:'Ravishankar',bids:[
+      ['Abdul Rahman','Ravishankar',10,'SAR'],['Jerin','Ravishankar',100,'INR'],['Akhin','Ravishankar',100,'INR'],['Akhila Mohan','Ravishankar',10,'AED'],['Nithin Suresh','Ravishankar',100,'INR'],['Dr. Allan','Ravishankar',100,'INR'],['Rahul Pillai','Ravishankar',10,'AED'],['Ameer Ali','Ravishankar',10,'AED'],['Syamsankar','Ravishankar',10,'AED'],['Bajith','Ravishankar',100,'INR'],['Vinod Nair','Ravishankar',10,'AED'],['Sabrish','Ravishankar',100,'INR'],
+      ['Nijil','Mrianna',10,'AED'],['Ravishankar','Mrianna',10,'AED'],['Hend Ali','Mrianna',10,'SAR'],['Parul Thakur','Mrianna',10,'AED'],['Sreeregh','Mrianna',10,'AED'],['Maha','Mrianna',10,'AED'],['Prabijith','Mrianna',10,'AED'],['Youstina','Mrianna',10,'AED'],['Beshoy','Mrianna',10,'AED']
+    ]},
+    {id:'m3',round:'Round of 16',a:'Anshad',b:'Ameer Ali',winner:'Anshad',bids:[
+      ['Jehin','Anshad',100,'INR'],['Nithin','Anshad',100,'INR'],['Minusha','Anshad',100,'INR'],['Vishnu','Anshad',100,'INR'],['Nijil','Anshad',10,'AED'],['Parul','Anshad',10,'AED'],['Jerin','Anshad',100,'INR'],['Abhishek','Anshad',100,'INR'],
+      ['Abdul Rahman','Ameer Ali',10,'SAR'],['Akhila Mohan','Ameer Ali',10,'AED'],['Vinod','Ameer Ali',10,'AED'],['Afsal S','Ameer Ali',10,'AED'],['Hend Ali','Ameer Ali',10,'SAR'],['Dr. Allan','Ameer Ali',100,'INR'],['Rahul Pillai','Ameer Ali',10,'AED'],['Syamsankar','Ameer Ali',10,'AED'],['Bajith','Ameer Ali',100,'INR'],['Youstina','Ameer Ali',10,'AED'],['Sreeregh','Ameer Ali',10,'AED'],['Maha','Ameer Ali',10,'AED'],['Beshoy','Ameer Ali',10,'AED']
+    ]},
+    {id:'m4',round:'Round of 16',a:'Aldrin',b:'Abdul Rahman',winner:'Abdul Rahman',bids:[
+      ['Jerin','Aldrin',100,'INR'],['Jehin','Aldrin',100,'INR'],['Hend Ali','Aldrin',10,'SAR'],['Ashkar','Aldrin',100,'INR'],['Akhila Mohan','Aldrin',10,'AED'],['Dr. Allan','Aldrin',100,'INR'],['Syamsankar','Aldrin',10,'AED'],['Parul','Aldrin',10,'AED'],['Bajith','Aldrin',100,'INR'],['Youstina','Aldrin',10,'AED'],['Abhishek','Aldrin',100,'INR'],['Maha','Aldrin',10,'AED'],['Sreeregh','Aldrin',10,'AED'],
+      ['Nithin','Abdul Rahman',100,'INR'],['Minusha','Abdul Rahman',100,'INR'],['Nijil','Abdul Rahman',10,'AED'],['Afsal S','Abdul Rahman',10,'AED'],['Sree Vishak','Abdul Rahman',10,'AED'],['Rahul Pillai','Abdul Rahman',10,'AED'],['Ameer Ali','Abdul Rahman',10,'AED'],['Vinod','Abdul Rahman',10,'AED']
+    ]},
+    {id:'m5',round:'Round of 16',a:'Dr. Allan',b:'Nithin Suresh',winner:'Dr. Allan',bids:[
+      ['Abdul Rahman','Dr. Allan',10,'SAR'],['Akhila Mohan','Dr. Allan',10,'AED'],['Minusha','Dr. Allan',100,'INR'],['Ameer Ali','Dr. Allan',10,'AED'],['Afsal S','Dr. Allan',10,'AED'],['Rahul Pillai','Dr. Allan',10,'AED'],['Syamsankar','Dr. Allan',10,'AED'],['Parul','Dr. Allan',10,'AED'],['Vinod','Dr. Allan',10,'AED'],['Bajith','Dr. Allan',100,'INR'],['Youstina','Dr. Allan',10,'AED'],['Sabrish','Dr. Allan',100,'INR'],['Beshoy','Dr. Allan',10,'AED'],
+      ['Jehin','Nithin Suresh',100,'INR'],['Nithin Suresh','Nithin Suresh',100,'INR'],['Nijil','Nithin Suresh',10,'AED'],['Hend Ali','Nithin Suresh',10,'SAR'],['Ashkar','Nithin Suresh',100,'INR'],['Maha','Nithin Suresh',10,'AED'],['Sreeregh','Nithin Suresh',10,'AED']
+    ]},
+    {id:'m6',round:'Round of 16',a:'Afsal S',b:'Abdul Fathaah',winner:'Abdul Fathaah',bids:[
+      ['Akhila Mohan','Afsal S',10,'AED'],['Nijil','Afsal S',10,'AED'],['Hend Ali','Afsal S',10,'SAR'],['Dr. Allan','Afsal S',100,'INR'],['Rahul Pillai','Afsal S',10,'AED'],['Ameer Ali','Afsal S',10,'AED'],['Syamsankar','Afsal S',10,'AED'],['Parul','Afsal S',10,'AED'],['Youstina','Afsal S',10,'AED'],['Prabijith','Afsal S',10,'AED'],['Sreeregh','Afsal S',10,'AED'],['Beshoy','Afsal S',10,'AED'],['Maha','Afsal S',10,'AED'],['Abdul Rahman','Afsal S',10,'SAR'],
+      ['Akhin','Abdul Fathaah',100,'INR'],['Nithin','Abdul Fathaah',100,'INR'],['Minusha','Abdul Fathaah',100,'INR'],['Ashkar','Abdul Fathaah',100,'INR'],['Bajith','Abdul Fathaah',100,'INR']
+    ]},
+    {id:'m7',round:'Round of 16',a:'Sreejith',b:'Sree Vishak',winner:'Sree Vishak',bids:[
+      ['Jerin','Sreejith',100,'INR'],['Nithin','Sreejith',100,'INR'],['Jehin','Sreejith',100,'INR'],['Ashkar','Sreejith',100,'INR'],['Aldrin','Sreejith',100,'INR'],['Bajith','Sreejith',100,'INR'],
+      ['Abdul Rahman','Sree Vishak',10,'SAR'],['Akhila Mohan','Sree Vishak',10,'AED'],['Minusha','Sree Vishak',100,'INR'],['Nijil','Sree Vishak',10,'AED'],['Hend Ali','Sree Vishak',10,'SAR'],['Beshoy','Sree Vishak',10,'AED'],['Afsal S','Sree Vishak',10,'AED'],['Dr. Allan','Sree Vishak',100,'INR'],['Rahul Pillai','Sree Vishak',10,'AED'],['Syamsankar','Sree Vishak',10,'AED'],['Sreeregh','Sree Vishak',10,'AED'],['Mrianna','Sree Vishak',10,'AED'],['Parul','Sree Vishak',10,'AED'],['Youstina','Sree Vishak',10,'AED'],['Maha','Sree Vishak',10,'AED']
+    ]},
+    {id:'m8',round:'Round of 16',a:'Akhila Mohan',b:'Nandakishore',winner:'Nandakishore',bids:[
+      ['Nijil','Akhila Mohan',10,'AED'],['Hend Ali','Akhila Mohan',10,'SAR'],['Ashkar','Akhila Mohan',100,'INR'],['Rahul Pillai','Akhila Mohan',10,'AED'],['Sreeregh','Akhila Mohan',10,'AED'],['Parul','Akhila Mohan',10,'AED'],['Youstina','Akhila Mohan',10,'AED'],['Maha','Akhila Mohan',10,'AED'],['Prabijith','Akhila Mohan',10,'AED'],
+      ['Abdul Rahman','Nandakishore',10,'SAR'],['Nithin','Nandakishore',100,'INR'],['Afsal S','Nandakishore',10,'AED'],['Akhila Mohan','Nandakishore',10,'AED'],['Beshoy','Nandakishore',10,'AED'],['Dr. Allan','Nandakishore',100,'INR'],['Syamsankar','Nandakishore',10,'AED'],['Bajith','Nandakishore',100,'INR']
+    ]},
+    {id:'qf1',round:'Quarter Finals',a:'Abdul Rahman',b:'Ravi Sankar',winner:'Ravi Sankar',bids:[
+      ['Jehin','Abdul Rahman',100,'INR'],['Ravi Sankar','Abdul Rahman',10,'AED'],['Nijil','Abdul Rahman',10,'AED'],['Minju','Abdul Rahman',10,'AED'],['Vinod Nair','Abdul Rahman',10,'AED'],
+      ['Nithin Suresh','Ravi Sankar',100,'INR'],['Donal','Ravi Sankar',100,'INR'],['Beshoy','Ravi Sankar',10,'AED'],['Abdul Rahman','Ravi Sankar',10,'SAR'],['Dr. Allan','Ravi Sankar',100,'INR'],['Rahul Pillai','Ravi Sankar',10,'AED'],['Lijo T George','Ravi Sankar',10,'AED'],['Anupama','Ravi Sankar',10,'AED'],['Vikas','Ravi Sankar',10,'AED'],['Sreeregh','Ravi Sankar',10,'AED'],['Ameer Ali','Ravi Sankar',10,'AED'],['Sameera','Ravi Sankar',10,'AED']
+    ]},
+    {id:'qf2',round:'Quarter Finals',a:'Anshad',b:'Gaurav Dani',winner:'Gaurav Dani',bids:[
+      ['Abhishek','Anshad',100,'INR'],['Nibin','Anshad',100,'INR'],['Dr. Allan','Anshad',100,'INR'],['Nijil','Anshad',10,'AED'],['Sameera','Anshad',10,'AED'],
+      ['Nithin Suresh','Gaurav Dani',100,'INR'],['Beshoy','Gaurav Dani',10,'AED'],['Rahul Pillai','Gaurav Dani',10,'AED'],['Lijo T George','Gaurav Dani',10,'AED'],['Minju','Gaurav Dani',10,'AED'],['Sreeregh','Gaurav Dani',10,'AED']
+    ]},
+    {id:'qf3',round:'Quarter Finals',a:'Dr. Allan',b:'Sree Vishak',winner:'Sree Vishak',bids:[
+      ['Abhishek','Dr. Allan',100,'INR'],['Nandakishore','Dr. Allan',10,'AED'],['Minju','Dr. Allan',10,'AED'],
+      ['Donal James','Sree Vishak',100,'INR'],['Beshoy','Sree Vishak',10,'AED'],['Abdul Rahman','Sree Vishak',10,'SAR'],['Dr. Allan','Sree Vishak',100,'INR'],['Rahul Pillai','Sree Vishak',10,'AED'],['Lijo T George','Sree Vishak',10,'AED'],['Nijil','Sree Vishak',10,'AED'],['Sreeregh','Sree Vishak',10,'AED']
+    ]},
+    {id:'qf4',round:'Quarter Finals',a:'Nandakishore',b:'Abdul Fathaah',winner:'Abdul Fathaah',bids:[
+      ['Faisal bin Fahd','Nandakishore',10,'SAR'],['Beshoy','Nandakishore',10,'AED'],['Anj Thomas','Nandakishore',100,'INR'],['Abdul Rahman','Nandakishore',10,'SAR'],['Dr. Allan','Nandakishore',100,'INR'],['Rahul Pillai','Nandakishore',10,'AED'],['Lijo T George','Nandakishore',10,'AED'],['Sreeregh','Nandakishore',10,'AED'],['Nijil','Nandakishore',10,'AED'],
+      ['Vishnu','Abdul Fathaah',100,'INR'],['Akhin','Abdul Fathaah',100,'INR'],['Jino Paul','Abdul Fathaah',100,'INR'],['Minju','Abdul Fathaah',10,'AED']
+    ]},
+    {id:'sf1',round:'Semi Finals',a:'Gaurav Dani',b:'Sree Vishak',winner:'Sree Vishak',bids:[
+      ['Vinod Nair','Gaurav Dani',10,'AED'],['Syamsankar','Gaurav Dani',10,'AED'],['Rahul Pillai','Gaurav Dani',10,'AED'],['Prabijith','Gaurav Dani',10,'AED'],['Nithin','Gaurav Dani',100,'INR'],['Sumith','Gaurav Dani',10,'AED'],
+      ['Afsal S','Sree Vishak',100,'INR'],['Ponnu','Sree Vishak',100,'INR'],['Sabrish','Sree Vishak',100,'INR'],['Allan','Sree Vishak',100,'INR'],['Ameer Ali','Sree Vishak',100,'INR'],['AbdulRahman Ali','Sree Vishak',100,'INR'],['Beshoy','Sree Vishak',100,'INR'],['Vikas','Sree Vishak',100,'INR'],['Sameera','Sree Vishak',100,'INR']
+    ]},
+    {id:'sf2',round:'Semi Finals',a:'Abdul Fathaah',b:'Ravi Sankar',winner:'Ravi Sankar',bids:[
+      ['Faisal bin Fahd','Abdul Fathaah',10,'SAR'],['Vinod Nair','Abdul Fathaah',10,'AED'],['Ravi Sankar','Abdul Fathaah',10,'AED'],['Jehin','Abdul Fathaah',100,'INR'],
+      ['Afsal S','Ravi Sankar',100,'INR'],['Ponnu','Ravi Sankar',100,'INR'],['Syamsankar','Ravi Sankar',100,'INR'],['Rahul Pillai','Ravi Sankar',100,'INR'],['Prabijith','Ravi Sankar',100,'INR'],['Nithin','Ravi Sankar',100,'INR'],['Sabrish','Ravi Sankar',100,'INR'],['Allan','Ravi Sankar',100,'INR'],['Ameer Ali','Ravi Sankar',100,'INR'],['AbdulRahman Ali','Ravi Sankar',100,'INR'],['Beshoy','Ravi Sankar',100,'INR'],['Sameera','Ravi Sankar',100,'INR']
+    ]},
+    {id:'final1',round:'Final',a:'Ravi Sankar',b:'Sree Vishak',winner:'Sree Vishak',bids:[
+      ['Morcos Sami','Ravi Sankar',10,'AED'],
+      ['Jehin','Ravi Sankar',100,'INR'],
+      ['Nibin','Ravi Sankar',100,'INR'],
+      ['Sneha Joesph','Ravi Sankar',10,'AED'],
+      ['Nithin','Ravi Sankar',100,'INR'],
+      ['Nanda kishore','Ravi Sankar',10,'AED'],
+      ['Anand','Ravi Sankar',10,'AED'],
+      ['AbdulRahman','Ravi Sankar',10,'SAR'],
+      ['Vikas','Ravi Sankar',100,'INR'],
+      ['Reshma tv','Ravi Sankar',100,'INR'],
+      ['Sreevishak','Ravi Sankar',10,'AED'],
+      ['Gaurav Dani','Ravi Sankar',10,'AED'],
+      ['Maha','Ravi Sankar',10,'AED'],
+
+      ['Minju','Sree Vishak',100,'INR'],
+      ['Sreeregh','Sree Vishak',100,'INR'],
+      ['Rahul Pillai','Sree Vishak',100,'INR'],
+      ['Jerin','Sree Vishak',100,'INR'],
+      ['Beshoy','Sree Vishak',100,'INR'],
+      ['Dolly Roy','Sree Vishak',100,'INR'],
+      ['Basil','Sree Vishak',100,'INR'],
+      ['Hend','Sree Vishak',100,'INR'],
+      ['Ravi Sankar','Sree Vishak',100,'INR'],
+      ['MInusha','Sree Vishak',100,'INR'],
+      ['Adhila Farha','Sree Vishak',100,'INR'],
+      ['Parul Thakur','Sree Vishak',100,'INR'],
+      ['Nijil','Sree Vishak',100,'INR'],
+      ['Sabrish','Sree Vishak',100,'INR'],
+      ['Keerthana sivadas','Sree Vishak',100,'INR'],
+      ['Sreejith','Sree Vishak',100,'INR']
+    ]}
+
+
+
+  ]
+};
+
+let state = load();
+
+function load(){
+  try{ const d=JSON.parse(localStorage.getItem(KEY)); if(d&&d.matches&&d.settings) return d; }catch(e){}
+  return JSON.parse(JSON.stringify(seed));
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(state)); render();}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function money(v){return '₹'+Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmt(v,n=2){return Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:n,maximumFractionDigits:n});}
+function round(v){const p=Math.pow(10,state.settings.decimals||2);return Math.round((v+Number.EPSILON)*p)/p}
+function equivalent(bid){return Number(bid[2]||0)*Number(state.settings[bid[3]]||0)}
+function fromINREquivalent(value,currency){
+  const rate=Number(state.settings[currency]||0);
+  if(!rate) return 0;
+  return round(Number(value||0)/rate);
+}
+function netEqualConversion(p){
+  // Convert NET INR-equivalent back to the currency/currencies in which this person has to collect.
+  // If there is no losing collection, default to INR because winner payout is in INR.
+  const used=[];
+  if(p.original.INR) used.push('INR');
+  if(p.original.AED) used.push('AED');
+  if(p.original.SAR) used.push('SAR');
+  if(!used.length) used.push('INR');
+
+  return used.map(currency=>{
+    const converted=fromINREquivalent(p.net,currency);
+    const sign=converted>0?'+':'';
+    const cls=converted>=0?'success-text':'danger-text';
+    return `<span class="${cls}">${sign}${fmt(converted,2)} ${currency}</span>`;
+  }).join('<br>');
+}
+function canonicalName(name){
+  const raw=String(name||'').trim();
+  const k=raw.toLowerCase().replace(/\s+/g,' ');
+  const aliases={
+    'dr.allan':'Dr. Allan','dr. allan':'Dr. Allan',
+    'nithin':'Nithin Suresh','nithin suresh':'Nithin Suresh',
+    'sreevishak':'Sree Vishak','sree vishak':'Sree Vishak',
+    'ameer':'Ameer Ali','ameer ali':'Ameer Ali',
+    'ravishankar':'Ravi Sankar','ravi sankar':'Ravi Sankar',
+    'parul':'Parul Thakur','parul thakur':'Parul Thakur',
+    'vinod':'Vinod Nair','vinod nair':'Vinod Nair',
+    'afsal':'Afsal S','afsal s':'Afsal S',
+    'allan':'Dr. Allan',
+    'abdulrahman':'Abdul Rahman',
+    'nanda kishore':'Nandakishore',
+    'hend':'Hend Ali',
+    'minusha':'Minusha'
+  };
+  return aliases[k]||raw;
+}
+function calc(m){
+  if(!m.winner) return {complete:false,winners:[],losers:[],pool:0,share:0,displayTotal:0,difference:0};
+  const winners=m.bids.filter(x=>x[1]===m.winner);
+  const losers=m.bids.filter(x=>x[1]!==m.winner);
+  const pool=losers.reduce((s,x)=>s+equivalent(x),0);
+  const share=winners.length?round(pool/winners.length):0;
+  const displayTotal=round(share*winners.length);
+  return {complete:true,winners,losers,pool:round(pool),share,displayTotal,difference:round(pool-displayTotal)};
+}
+function people(){
+  const map=new Map();
+  state.matches.forEach(m=>m.bids.forEach(b=>{const key=canonicalName(b[0]); if(!map.has(key))map.set(key,{name:key,bids:0,wins:0,losses:0,receive:0,payINR:0,original:{INR:0,AED:0,SAR:0}}); const p=map.get(key);p.bids++; if(m.winner){if(b[1]===m.winner){p.wins++;p.receive+=calc(m).share}else{p.losses++;p.payINR+=equivalent(b);p.original[b[3]]=(p.original[b[3]]||0)+Number(b[2]);}}}));
+  return [...map.values()].map(p=>({...p,receive:round(p.receive),payINR:round(p.payINR),net:round(p.receive-p.payINR)})).sort((a,b)=>a.name.localeCompare(b.name));
+}
+function setView(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));
+  document.getElementById(v+'View').classList.remove('hidden');
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+}
+document.getElementById('nav').addEventListener('click',e=>{if(e.target.dataset.view)setView(e.target.dataset.view)});
+
+function header(title,sub,buttons=''){return `<div class="topbar"><div><h2>${title}</h2><p>${sub}</p></div><div class="actions">${buttons}</div></div>`}
+
+function renderDashboard(){
+  const completed=state.matches.filter(m=>m.winner).length, totalPool=state.matches.reduce((s,m)=>s+calc(m).pool,0), totalBids=state.matches.reduce((s,m)=>s+m.bids.length,0);
+  const ppl=people(), receivable=ppl.reduce((s,p)=>s+p.receive,0);
+  const roundStats=[...new Set(state.matches.map(m=>m.round))].map(r=>{
+    const ms=state.matches.filter(m=>m.round===r);
+    return {round:r,matches:ms.length,pool:ms.reduce((s,m)=>s+calc(m).pool,0),bids:ms.reduce((s,m)=>s+m.bids.length,0)};
+  });
+  let rows=state.matches.map(m=>{const c=calc(m);return `<tr><td><div class="match-title">${esc(m.a)} vs ${esc(m.b)}</div><div class="sub">${esc(m.round)}</div></td><td>${m.winner?`<span class="pill done">${esc(m.winner)}</span>`:'<span class="pill open">Pending</span>'}</td><td class="num">${m.bids.length}</td><td class="num">${money(c.pool)}</td><td class="num">${c.winners.length}</td><td class="num">${money(c.share)}</td><td><button class="btn small" onclick="openResult('${m.id}')">View</button></td></tr>`}).join('');
+  document.getElementById('dashboardView').innerHTML=header('Dashboard','Round-wise bid collection, results and payout summary',`<button class="btn primary" onclick="openMatchModal()">+ New Match</button>`) + `
+  <div class="grid4">
+    <div class="stat"><div class="label">Matches</div><div class="value">${state.matches.length}</div></div>
+    <div class="stat"><div class="label">Completed</div><div class="value">${completed}</div></div>
+    <div class="stat"><div class="label">Bid entries</div><div class="value">${totalBids}</div></div>
+    <div class="stat"><div class="label">Losing pools (INR eq.)</div><div class="value">${money(totalPool)}</div></div>
+  </div>
+  <div class="card"><h3>Round Summary</h3><div class="table-wrap"><table><thead><tr><th>Round</th><th class="num">Matches</th><th class="num">Bid Entries</th><th class="num">Losing Pool</th></tr></thead><tbody>${roundStats.map(r=>`<tr><td><b>${esc(r.round)}</b></td><td class="num">${r.matches}</td><td class="num">${r.bids}</td><td class="num">${money(r.pool)}</td></tr>`).join('')}</tbody></table></div></div>
+  <div class="card"><h3>Match Summary</h3><div class="table-wrap"><table><thead><tr><th>Match</th><th>Winner</th><th class="num">Bids</th><th class="num">Loser Pool</th><th class="num">Winning Bidders</th><th class="num">Share / Winner</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="footer-note">Tournament conversion values currently used: 1 INR = ₹${state.settings.INR}, 1 AED = ₹${state.settings.AED}, 1 SAR = ₹${state.settings.SAR}. These are editable in Settings.</div></div>`;
+}
+function renderMatches(){
+  let rows=state.matches.map(m=>{const c=calc(m);return `<tr><td><div class="match-title">${esc(m.a)} vs ${esc(m.b)}</div><div class="sub">${esc(m.round)}</div></td><td>${m.winner?esc(m.winner):'—'}</td><td class="num">${m.bids.length}</td><td class="num">${money(c.pool)}</td><td><div class="actions"><button class="btn small" onclick="openBids('${m.id}')">Bids</button><button class="btn small" onclick="openResult('${m.id}')">Result</button><button class="btn small" onclick="openMatchModal('${m.id}')">Edit</button><button class="btn small danger" onclick="deleteMatch('${m.id}')">Delete</button></div></td></tr>`}).join('');
+  document.getElementById('matchesView').innerHTML=header('Matches & Bids','Create matches, enter predictions and declare winners',`<button class="btn primary" onclick="openMatchModal()">+ New Match</button>`) + `<div class="card"><div class="table-wrap"><table><thead><tr><th>Match</th><th>Winner</th><th class="num">Bid entries</th><th class="num">Loser pool</th><th>Actions</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="empty">No matches yet.</td></tr>'}</tbody></table></div></div>`;
+}
+function renderSettlement(){
+  const ps=people();
+  const rows=ps.map(p=>`<tr>
+    <td>${esc(p.name)}</td>
+    <td class="num">${p.original.INR?fmt(p.original.INR,0)+' INR':'—'}</td>
+    <td class="num">${p.original.AED?fmt(p.original.AED,0)+' AED':'—'}</td>
+    <td class="num">${p.original.SAR?fmt(p.original.SAR,0)+' SAR':'—'}</td>
+    <td class="num">${money(p.payINR)}</td>
+    <td class="num success-text">${money(p.receive)}</td>
+    <td class="num ${p.net>=0?'success-text':'danger-text'}">${p.net>=0?'+':''}${money(p.net)}</td>
+    <td class="num">${netEqualConversion(p)}</td>
+  </tr>`).join('');
+
+  document.getElementById('settlementView').innerHTML=
+    header('Overall Settlement','Combined result from every completed match',
+      `<button class="btn" onclick="exportSettlement()">Export CSV</button><button class="btn" onclick="window.print()">Print</button>`) + `
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Person</th>
+              <th class="num">Collect INR</th>
+              <th class="num">Collect AED</th>
+              <th class="num">Collect SAR</th>
+              <th class="num">Payable INR Eq.</th>
+              <th class="num">Winner Payout</th>
+              <th class="num">Net INR Eq.</th>
+              <th class="num">Net Equal Conversion</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="footer-note">
+        Example: Net INR Eq. = ₹500 and Collect AED is used → Net Equal Conversion = 20.00 AED when 1 AED = ₹25.
+      </div>
+    </div>`;
+}
+function renderPeople(){
+  const ps=people();
+  const rows=ps.map(p=>`<tr><td>${esc(p.name)}</td><td class="num">${p.bids}</td><td class="num">${p.wins}</td><td class="num">${p.losses}</td><td class="num">${money(p.receive)}</td><td class="num">${money(p.payINR)}</td></tr>`).join('');
+  document.getElementById('peopleView').innerHTML=header('People','All bidders automatically collected from match entries')+`<div class="card"><div class="table-wrap"><table><thead><tr><th>Name</th><th class="num">Bids</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Payout</th><th class="num">Lost INR Eq.</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function renderSettings(){
+  document.getElementById('settingsView').innerHTML=header('Settings','Tournament conversion values and data management')+`
+  <div class="card"><h3>Bid conversion to INR-equivalent</h3><div class="notice">Based on the supplied Round-of-16, Quarter-Final, Semi-Final and Final sheets: 100 INR = ₹100, 10 AED = ₹250 and 10 SAR = ₹250. These are tournament bid values, not live foreign-exchange rates.</div>
+  <div class="form-grid">
+    <div class="field"><label>1 INR equals ₹</label><input id="sINR" type="number" step="0.01" value="${state.settings.INR}"></div>
+    <div class="field"><label>1 AED equals ₹</label><input id="sAED" type="number" step="0.01" value="${state.settings.AED}"></div>
+    <div class="field"><label>1 SAR equals ₹</label><input id="sSAR" type="number" step="0.01" value="${state.settings.SAR}"></div>
+    <div class="field"><label>Payout decimal places</label><input id="sDec" type="number" min="0" max="4" value="${state.settings.decimals}"></div>
+  </div><div class="actions" style="margin-top:14px"><button class="btn primary" onclick="saveSettings()">Save Settings</button></div></div>
+  <div class="card"><h3>Data backup</h3><div class="actions"><button class="btn" onclick="downloadBackup()">Download JSON Backup</button><label class="btn">Import JSON<input type="file" accept=".json" onchange="importBackup(event)" style="display:none"></label><button class="btn danger" onclick="resetDemo()">Reset to supplied tournament data</button></div></div>`;
+}
+function render(){renderDashboard();renderMatches();renderSettlement();renderPeople();renderSettings()}
+function saveSettings(){state.settings.INR=+document.getElementById('sINR').value||1;state.settings.AED=+document.getElementById('sAED').value||0;state.settings.SAR=+document.getElementById('sSAR').value||0;state.settings.decimals=Math.max(0,Math.min(4,+document.getElementById('sDec').value||2));save();alert('Settings saved.');}
+
+function openMatchModal(id){
+  const m=id?state.matches.find(x=>x.id===id):{id:'m'+Date.now(),round:'Round of 16',a:'',b:'',winner:'',bids:[]};
+  const isNew=!id;
+  modal(`<h3>${isNew?'Create Match':'Edit Match'}</h3><div class="form-grid">
+    <div class="field full"><label>Round</label><input id="mmRound" value="${esc(m.round)}"></div>
+    <div class="field"><label>Player A</label><input id="mmA" value="${esc(m.a)}"></div>
+    <div class="field"><label>Player B</label><input id="mmB" value="${esc(m.b)}"></div>
+    <div class="field full"><label>Winner</label><select id="mmWinner"><option value="">Not completed</option><option value="A" ${m.winner===m.a?'selected':''}>${esc(m.a||'Player A')}</option><option value="B" ${m.winner===m.b?'selected':''}>${esc(m.b||'Player B')}</option></select></div>
+  </div><div class="modal-footer"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="saveMatch('${m.id}',${isNew})">Save Match</button></div>`);
+}
+function saveMatch(id,isNew){
+  const round=document.getElementById('mmRound').value.trim(),a=document.getElementById('mmA').value.trim(),b=document.getElementById('mmB').value.trim(),w=document.getElementById('mmWinner').value;
+  if(!a||!b||a===b)return alert('Enter two different player names.');
+  if(isNew)state.matches.push({id,round:round||'Round',a,b,winner:w==='A'?a:w==='B'?b:'',bids:[]});
+  else{const m=state.matches.find(x=>x.id===id); const oldA=m.a,oldB=m.b;m.round=round;m.a=a;m.b=b;m.bids.forEach(x=>{if(x[1]===oldA)x[1]=a;if(x[1]===oldB)x[1]=b});m.winner=w==='A'?a:w==='B'?b:'';}
+  closeModal();save();
+}
+function deleteMatch(id){if(confirm('Delete this match and all its bids?')){state.matches=state.matches.filter(x=>x.id!==id);save()}}
+function openBids(id){
+  const m=state.matches.find(x=>x.id===id);
+  const rows=m.bids.map((b,i)=>`<tr><td>${esc(b[0])}</td><td>${esc(b[1])}</td><td class="num">${fmt(b[2],0)} ${b[3]}</td><td class="num">${money(equivalent(b))}</td><td><button class="btn small danger" onclick="removeBid('${id}',${i})">Remove</button></td></tr>`).join('');
+  modal(`<h3>${esc(m.a)} vs ${esc(m.b)} — Bids</h3>
+  <div class="form-grid">
+    <div class="field"><label>Bidder name</label><input id="bidName" placeholder="e.g. Jerin"></div>
+    <div class="field"><label>Prediction</label><select id="bidSide"><option>${esc(m.a)}</option><option>${esc(m.b)}</option></select></div>
+    <div class="field"><label>Amount</label><input id="bidAmount" type="number" step="0.01" value="100"></div>
+    <div class="field"><label>Currency</label><select id="bidCurrency" onchange="presetAmount()"><option>INR</option><option>AED</option><option>SAR</option></select></div>
+  </div>
+  <div class="actions" style="margin:12px 0"><button class="btn primary" onclick="addBid('${id}')">+ Add Bid</button></div>
+  <div class="table-wrap"><table><thead><tr><th>Bidder</th><th>Selected Player</th><th class="num">Original Bid</th><th class="num">INR Eq.</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="empty">No bids added.</td></tr>'}</tbody></table></div>
+  <div class="modal-footer"><button class="btn" onclick="closeModal()">Close</button><button class="btn primary" onclick="closeModal();openResult('${id}')">View Result</button></div>`);
+}
+function presetAmount(){const c=document.getElementById('bidCurrency').value;document.getElementById('bidAmount').value=c==='INR'?100:10}
+function addBid(id){
+  const m=state.matches.find(x=>x.id===id),name=document.getElementById('bidName').value.trim(),side=document.getElementById('bidSide').value,amount=+document.getElementById('bidAmount').value,currency=document.getElementById('bidCurrency').value;
+  if(!name||!amount||amount<=0)return alert('Enter a bidder name and valid amount.');
+  if(m.bids.some(x=>x[0].trim().toLowerCase()===name.toLowerCase())) if(!confirm(name+' already has a bid in this match. Add another anyway?'))return;
+  m.bids.push([name,side,amount,currency]);save();openBids(id);
+}
+function removeBid(id,i){const m=state.matches.find(x=>x.id===id);m.bids.splice(i,1);save();openBids(id)}
+
+function openResult(id){
+  const m=state.matches.find(x=>x.id===id),c=calc(m);
+  const winnerOpts=`<option value="">Select winner</option><option value="${esc(m.a)}" ${m.winner===m.a?'selected':''}>${esc(m.a)}</option><option value="${esc(m.b)}" ${m.winner===m.b?'selected':''}>${esc(m.b)}</option>`;
+  let content=`<h3>${esc(m.a)} vs ${esc(m.b)}</h3><div class="field"><label>Match Winner</label><select id="resultWinner" onchange="setWinner('${id}',this.value)">${winnerOpts}</select></div>`;
+  if(!m.winner){content+=`<div class="empty">Select the winner to calculate losers, pool and payout.</div>`}
+  else{
+    const winrows=c.winners.map(x=>`<tr><td>${esc(x[0])}</td><td class="num">${money(c.share)}</td></tr>`).join('');
+    const loserrows=c.losers.map(x=>`<tr><td>${esc(x[0])}</td><td class="num">${fmt(x[2],0)} ${x[3]}</td><td class="num">${money(equivalent(x))}</td></tr>`).join('');
+    content+=`<div class="summary-strip"><span class="summary-chip">Loser pool: <b>${money(c.pool)}</b></span><span class="summary-chip">Winning bidders: <b>${c.winners.length}</b></span><span class="summary-chip">Share each: <b>${money(c.share)}</b></span><span class="summary-chip">Displayed payout total: <b>${money(c.displayTotal)}</b></span>${c.difference?`<span class="summary-chip">Rounding difference: <b>${money(c.difference)}</b></span>`:''}</div>
+    <div class="result-grid" style="margin-top:16px">
+      <div class="sidebox green"><div class="head">WINNERS — ${esc(m.winner)}</div><div class="table-wrap" style="border:0;border-radius:0"><table style="min-width:0"><thead><tr><th>Name</th><th class="num">Payout (INR)</th></tr></thead><tbody>${winrows||'<tr><td colspan="2" class="empty">No winning bidders.</td></tr>'}</tbody></table></div></div>
+      <div class="sidebox red"><div class="head">LOSERS — ${esc(m.winner===m.a?m.b:m.a)}</div><div class="table-wrap" style="border:0;border-radius:0"><table style="min-width:0"><thead><tr><th>Name</th><th class="num">Collect</th><th class="num">INR Eq.</th></tr></thead><tbody>${loserrows||'<tr><td colspan="3" class="empty">No losing bidders.</td></tr>'}</tbody></table></div></div>
+    </div>`;
+  }
+  content+=`<div class="modal-footer"><button class="btn" onclick="closeModal()">Close</button><button class="btn" onclick="closeModal();openBids('${id}')">Edit Bids</button></div>`;
+  modal(content);
+}
+function setWinner(id,w){state.matches.find(x=>x.id===id).winner=w;save();openResult(id)}
+
+function modal(inner){document.getElementById('modalRoot').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">${inner}</div></div>`}
+function closeModal(){document.getElementById('modalRoot').innerHTML=''}
+
+function exportSettlement(){
+  const rows=[['Person','Collect INR','Collect AED','Collect SAR','Payable INR Equivalent','Winner Payout INR','Net INR Equivalent','Net Equal Conversion']];
+  people().forEach(p=>{
+    const used=[];
+    if(p.original.INR) used.push('INR');
+    if(p.original.AED) used.push('AED');
+    if(p.original.SAR) used.push('SAR');
+    if(!used.length) used.push('INR');
+
+    const equal=used.map(currency=>{
+      const converted=fromINREquivalent(p.net,currency);
+      const sign=converted>0?'+':'';
+      return `${sign}${converted.toFixed(2)} ${currency}`;
+    }).join(' / ');
+
+    rows.push([
+      p.name,
+      p.original.INR||0,
+      p.original.AED||0,
+      p.original.SAR||0,
+      p.payINR,
+      p.receive,
+      p.net,
+      equal
+    ]);
+  });
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
+  download('pool-bid-settlement.csv',csv,'text/csv');
+}
+function downloadBackup(){download('pool-bid-manager-backup.json',JSON.stringify(state,null,2),'application/json')}
+function download(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
+function importBackup(e){
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.matches||!d.settings)throw 0;state=d;save();alert('Backup imported.')}catch(_){alert('Invalid backup file.')}};r.readAsText(f)
+}
+function resetDemo(){if(confirm('Replace all current data with the supplied tournament data?')){state=JSON.parse(JSON.stringify(seed));save()}}
+
+render();
+</script>
+</body>
+</html>
